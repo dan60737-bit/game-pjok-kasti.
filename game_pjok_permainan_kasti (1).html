@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Petualangan PJOK - Permainan Kasti</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#eef5fb;color:#17324d}
+main{max-width:900px;margin:auto;padding:18px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+h1{margin:4px 0;font-size:clamp(23px,4vw,34px)}.sub{color:#52677b;margin:5px 0 14px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:12px 0}
+.stat{background:white;border-radius:13px;padding:12px;box-shadow:0 2px 8px #17324d12}.stat small{display:block;color:#66798a}.stat b{font-size:22px}
+.arena{position:relative;border-radius:18px;overflow:hidden;background:#a9e2ff;box-shadow:0 5px 18px #17324d20}
+canvas{display:block;width:100%;height:auto;touch-action:manipulation}
+.overlay{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:22px;background:#102f47c9;color:white}
+.overlay h2{font-size:clamp(24px,5vw,38px);margin:8px}.overlay p{max-width:480px;line-height:1.5}
+button{border:0;border-radius:12px;padding:13px 16px;font-weight:700;font-size:15px;cursor:pointer;background:white;color:#17324d;box-shadow:0 2px 7px #102f4720}
+button:active{transform:scale(.98)}.primary{background:#0879c9;color:white}.actions{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:13px 0}
+.actions button{min-height:66px}.actions strong{display:block;font-size:23px}.actions span{font-size:12px}
+.row{display:flex;gap:9px}.row button{flex:1}
+.panel{background:white;padding:15px;border-radius:14px;margin-top:12px;box-shadow:0 2px 8px #17324d12}
+#title{font-size:20px;font-weight:800}#instruction{color:#52677b;line-height:1.45}
+#message{text-align:center;font-weight:700;color:#0879c9;min-height:24px;margin:12px 0}
+.progress{height:8px;background:#dce8f1;border-radius:99px;overflow:hidden;margin:8px 0 12px}.bar{height:100%;background:#16a36a;width:0%;transition:width .2s}
+@media(max-width:520px){main{padding:12px}.stats{gap:6px}.stat{padding:9px}.stat b{font-size:19px}.actions{gap:6px}.actions button{padding:9px 4px}}
+</style>
+</head>
+<body>
+<main>
+ <div class="top"><div><div style="font-size:12px;font-weight:bold;color:#0879c9;letter-spacing:1px">GAME EDUKASI PJOK SD</div><h1>⚾ Petualangan Permainan Kasti</h1><p class="sub">Belajar sambil bermain: pukul, tangkap, dan lempar bola!</p></div><div style="font-size:42px">🏏</div></div>
+ <div class="stats">
+  <div class="stat"><small>SKOR</small><b id="score">0</b></div>
+  <div class="stat"><small>MISI</small><b id="mission">1 / 3</b></div>
+  <div class="stat"><small>NYAWA</small><b id="life">❤️❤️❤️</b></div>
+ </div>
+ <div class="arena">
+  <canvas id="game" width="800" height="440" aria-label="Animasi permainan kasti"></canvas>
+  <div class="overlay" id="overlay"><div style="font-size:58px">🏏</div><h2>SIAP BERMAIN?</h2><p>Selesaikan 3 misi permainan kasti. Gunakan tombol untuk memukul, menangkap, dan melempar bola ke sasaran.</p><button class="primary" id="start">▶ MULAI PETUALANGAN</button></div>
+ </div>
+ <div class="panel">
+  <div id="title">Misi 1: Memukul Bola</div>
+  <div class="progress"><div class="bar" id="bar"></div></div>
+  <p id="instruction">Tekan tombol PUKUL ketika bola mendekati pemain.</p>
+  <div class="actions">
+   <button id="swing"><strong>🏏</strong><span>PUKUL</span></button>
+   <button id="catch"><strong>🧤</strong><span>TANGKAP</span></button>
+   <button id="throw"><strong>⚾</strong><span>LEMPAR</span></button>
+  </div>
+  <div class="row"><button id="pause">Ⅱ JEDA</button><button id="reset">↻ ULANG GAME</button></div>
+  <div id="message">Ayo menjadi juara permainan kasti! 🏆</div>
+ </div>
+ <div class="panel"><b>📚 Panduan Misi</b><p>🏏 <b>Misi 1:</b> Pukul bola yang datang mendekat.</p><p>🧤 <b>Misi 2:</b> Tangkap bola yang melayang.</p><p>⚾ <b>Misi 3:</b> Lempar bola menuju sasaran.</p><small>Game ini merupakan simulasi gerakan dasar untuk pembelajaran PJOK.</small></div>
+</main>
+<script>
+const $=id=>document.getElementById(id),canvas=$('game'),ctx=canvas.getContext('2d');
+let mission=0,score=0,life=3,success=0,started=false,paused=false,frame=0,raf=0,mode='idle',timer=0,feedback='',feedbackTime=0;
+let ball={x:690,y:300,vx:-3.5,vy:0,r:12};
+const titles=['Memukul Bola','Menangkap Bola','Melempar Bola'];
+const instructions=['Tekan PUKUL ketika bola mendekati pemain.','Tekan TANGKAP ketika bola mendekati tangan pemain.','Tekan LEMPAR untuk mengarahkan bola ke sasaran.'];
+function say(s){feedback=s;feedbackTime=90;$('message').textContent=s}
+function update(){ $('score').textContent=score;$('mission').textContent=Math.min(mission+1,3)+' / 3';$('life').textContent='❤️'.repeat(life)+'♡'.repeat(3-life);$('title').textContent=mission<3?'Misi '+(mission+1)+': '+titles[mission]:'Misi selesai';$('instruction').textContent=instructions[mission]||'Semua tantangan selesai!';$('bar').style.width=(success/3*100)+'%';}
+function resetBall(){ball={x:690,y:300,vx:-3.5,vy:0,r:12};mode='idle';timer=0}
+function start(){cancelAnimationFrame(raf);mission=0;score=0;life=3;success=0;started=true;paused=false;frame=0;resetBall();$('overlay').style.display='none';$('pause').textContent='Ⅱ JEDA';update();say('Misi pertama dimulai. Siapkan pemukul!');loop()}
+function next(){mission++;resetBall();if(mission>=3){finish();return}update();say('Hebat! Lanjut ke misi '+(mission+1)+': '+titles[mission])}
+function fail(msg){life--;update();if(life<=0){started=false;$('overlay').innerHTML='<div style="font-size:55px">💪</div><h2>TETAP SEMANGAT!</h2><p>Skor akhir: '+score+' poin. Ayo coba lagi!</p><button class="primary" id="again">↻ COBA LAGI</button>';$('overlay').style.display='flex';$('again').onclick=start}else{say(msg+' Coba lagi!');resetBall()}}
+function finish(){started=false;update();$('overlay').innerHTML='<div style="font-size:60px">🏆</div><h2>JUARA KASTI!</h2><p>Kamu berhasil menyelesaikan semua tantangan.</p><div style="font-size:32px;font-weight:bold;margin:8px">'+score+' POIN</div><button class="primary" id="again">↻ MAIN LAGI</button>';$('overlay').style.display='flex';$('again').onclick=start;say('Selamat! Kamu menjadi juara permainan kasti!')}
+function action(type){if(!started||paused)return;
+ if(mission===0&&type==='swing'&&mode==='idle'){if(ball.x<430&&ball.x>270){mode='hit';ball.vx=8;ball.vy=-7;timer=0;score+=10;success++;update();say('💥 PUKULAN BERHASIL! +10 poin')}else say('Tunggu bola mendekat ke pemukul!')}
+ else if(mission===1&&type==='catch'&&mode==='idle'){if(ball.x>250&&ball.x<405&&ball.y>205&&ball.y<345){mode='caught';score+=10;success++;update();say('🧤 TANGKAPAN HEBAT! +10 poin');setTimeout(()=>{if(started&&mission===1&&mode==='caught')next()},1000)}else say('Perhatikan arah bola. Tangkap saat mendekat!')}
+ else if(mission===2&&type==='throw'&&mode==='idle'){mode='throw';timer=0;ball.x=270;ball.y=300;ball.vx=8;ball.vy=-7;score+=10;update();say('⚾ LEMPARAN DILEPASKAN! +10 poin')}
+ else say('Gunakan tombol sesuai misi saat ini!')}
+function circle(x,y,r,color){ctx.fillStyle=color;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill()}
+function draw(){let t=frame*.045;ctx.clearRect(0,0,800,440);
+ ctx.fillStyle='#a9e2ff';ctx.fillRect(0,0,800,255);circle(690,65,33,'#ffe36c');
+ ctx.fillStyle='#fff';[[105,75],[315,48],[520,100]].forEach(([x,y])=>{circle(x,y,18,'white');circle(x+22,y-7,22,'white');circle(x+43,y,16,'white')});
+ ctx.fillStyle='#68b85d';ctx.fillRect(0,255,800,185);ctx.strokeStyle='#eff8ce';ctx.lineWidth=3;ctx.strokeRect(30,270,740,145);ctx.beginPath();ctx.moveTo(400,270);ctx.lineTo(400,415);ctx.stroke();ctx.beginPath();ctx.arc(400,342,48,0,Math.PI*2);ctx.stroke();
+ ctx.fillStyle='#fff1a5';ctx.fillRect(85,315,25,25);ctx.fillRect(690,315,25,25);
+ if(mission===2){ctx.strokeStyle='#ffdf55';ctx.lineWidth=6;ctx.beginPath();ctx.arc(690,175,39,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#17324d';ctx.font='bold 15px Arial';ctx.fillText('TARGET',660,120)}
+ let px=270,py=300,swing=mode==='hit'&&timer<18,throwing=mode==='throw'&&timer<15;
+ ctx.lineCap='round';ctx.lineWidth=11;ctx.strokeStyle='#28394b';ctx.beginPath();ctx.moveTo(px,py+45);ctx.lineTo(px-13,py+92);ctx.moveTo(px,py+45);ctx.lineTo(px+15,py+92);ctx.stroke();
+ ctx.fillStyle='#f6f7fb';ctx.beginPath();ctx.roundRect(px-22,py-5,44,58,10);ctx.fill();ctx.fillStyle='#1766ae';ctx.fillRect(px-21,py+23,42,27);
+ circle(px,py-25,24,'#c98759');ctx.fillStyle='#28394b';ctx.beginPath();ctx.arc(px,py-31,24,Math.PI,Math.PI*2);ctx.fill();
+ ctx.strokeStyle='#c98759';ctx.lineWidth=11;ctx.beginPath();ctx.moveTo(px-17,py+5);ctx.lineTo(px-38,py+28);ctx.lineTo(px-48,py+15);ctx.moveTo(px+17,py+5);ctx.lineTo(px+36,py+23);ctx.lineTo(px+47,py+12);ctx.stroke();
+ if(mission===1){ctx.fillStyle='#e6b64d';ctx.beginPath();ctx.arc(px+47,py+12,14,0,Math.PI*2);ctx.fill()}
+ ctx.save();ctx.translate(px+37,py+25);ctx.rotate(swing?-1.45:throwing?.3:-.7);ctx.fillStyle='#875020';ctx.fillRect(-5,-80,10,88);ctx.fillStyle='#dba46a';ctx.fillRect(-7,-84,14,17);ctx.restore();
+ if(mode!=='caught'&&mode!=='hitdone'){circle(ball.x+3,ball.y+4,ball.r+1,'#39743c');circle(ball.x,ball.y,ball.r,'#fff');ctx.strokeStyle='#d64b3d';ctx.lineWidth=2;ctx.beginPath();ctx.arc(ball.x,ball.y,7,-1,1);ctx.stroke()}
+ ctx.fillStyle='#17324d';ctx.font='bold 17px Arial';ctx.fillText(mission===0?'BATTER ZONE':mission===1?'CATCH ZONE':'THROW TO TARGET',22,30);
+ if(feedbackTime>0){ctx.fillStyle='#15334b';ctx.globalAlpha=.88;ctx.beginPath();ctx.roundRect(205,48,390,39,12);ctx.fill();ctx.globalAlpha=1;ctx.fillStyle='white';ctx.font='bold 15px Arial';ctx.textAlign='center';ctx.fillText(feedback,400,73);ctx.textAlign='left'}
+}
+function loop(){cancelAnimationFrame(raf);function tick(){if(!started)return;if(!paused){frame++;if(feedbackTime>0)feedbackTime--;
+ if(mode==='idle'){ball.x+=ball.vx;if(mission===1)ball.y=300-65*Math.sin(Math.max(0,(690-ball.x)/430)*Math.PI);else ball.y=300+Math.sin(frame*.12)*2;if(ball.x<170)fail('Bola terlewat!')}
+ else if(mode==='hit'||mode==='throw'){ball.x+=ball.vx;ball.y+=ball.vy;ball.vy+=.19;timer++;if(ball.y>355){ball.y=355;ball.vy=-Math.abs(ball.vy)*.55}
+ if(mission===0&&ball.x>770)next();
+ if(mission===2&&ball.x>640&&ball.y<220){mode='hitdone';score+=10;update();say('🎯 TEPAT SASARAN! BONUS +10');setTimeout(()=>{if(started&&mission===2)next()},850)}
+ if(mission===2&&ball.x>810&&mode==='throw')fail('Lemparan belum tepat sasaran!')}}
+ draw();raf=requestAnimationFrame(tick)}tick()}
+$('start').onclick=start;$('swing').onclick=()=>action('swing');$('catch').onclick=()=>action('catch');$('throw').onclick=()=>action('throw');
+$('pause').onclick=()=>{if(!started)return;paused=!paused;$('pause').textContent=paused?'▶ LANJUT':'Ⅱ JEDA';say(paused?'Permainan dijeda.':'Ayo lanjut bermain!')};
+$('reset').onclick=start;update();draw();
+</script>
+</body>
+</html>
